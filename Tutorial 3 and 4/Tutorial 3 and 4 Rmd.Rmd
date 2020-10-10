@@ -1,0 +1,164 @@
+---
+title: "Tutorial 3/4"
+author: "Karen Hwang"
+date: "09/10/2020"
+output: html_document
+---
+## Exercise 1.1: Regression
+```{r}
+#Added CRAN portion since it was having problems with knitting without it
+r = getOption("repos")
+r["CRAN"] = "http://cran.us.r-project.org"
+options(repos = r)
+install.packages("readxl")
+suppressPackageStartupMessages(library(readxl))
+data_reg3 <- read_excel("example_linear-reg_dataset1.xls", sheet = "Hoja3")
+lmHeight3 = lm(height~age + playtime, data = data_reg3)
+
+summary(lmHeight3)
+
+```
+
+### Regression Plot
+The residuals appear to be random
+```{r}
+plot(lmHeight3$residuals, ylab='Residuals')
+```
+
+
+
+
+## Exercise 2.1: Clustering
+```{r}
+set.seed(786)
+data_seeds <- read.csv("seeds_dataset.txt" ,sep = '\t',header = FALSE)
+feature_name <- c('area','perimeter','compactness','length.of.kernel','width.of.kernal','asymmetry.coefficient','length.of.kernel.groove','type.of.seed')
+colnames(data_seeds) <- feature_name
+
+#check if everything is numerical and for any missing/NA values 
+str(data_seeds)
+any(is.na(data_seeds))
+
+#Exclude the type.of.seed column from the dataset in order to do clustering
+seeds_label <- data_seeds$type.of.seed
+data_seeds$type.of.seed <- NULL
+
+#Scale all the columns
+data_seeds_norm <- as.data.frame(scale(data_seeds))
+summary(data_seeds_norm)
+
+#Build distance matrix
+dist_mat <- dist(data_seeds_norm, method = 'euclidean')
+
+```
+
+### Hierarchical Clustering - Complete Linkage
+```{r}
+hclust_comp <- hclust(dist_mat, method = 'complete')
+plot(hclust_comp)
+
+cut_comp <- cutree(hclust_comp, k = 3)
+plot(hclust_comp)
+rect.hclust(hclust_comp , k = 3, border = 2:6)
+
+abline(h = 3, col = 'red')
+
+suppressPackageStartupMessages(library(dplyr))
+data_seeds_comp_cl <- mutate(data_seeds, cluster = cut_comp)
+count(data_seeds_comp_cl,cluster)
+
+suppressPackageStartupMessages(library(ggplot2))
+ggplot(data_seeds_comp_cl, aes(x=area, y = perimeter, color = factor(cluster))) + geom_point()
+table(data_seeds_comp_cl$cluster,seeds_label)
+```
+
+### Hierarchal Clustering - Average Linkage
+```{r}
+hclust_avg <- hclust(dist_mat, method = 'average')
+plot(hclust_avg)
+
+cut_avg <- cutree(hclust_avg, k = 3)
+plot(hclust_avg)
+rect.hclust(hclust_avg , k = 3, border = 2:6)
+
+abline(h = 3, col = 'red')
+
+suppressPackageStartupMessages(library(dplyr))
+data_seeds_avg_cl <- mutate(data_seeds, cluster = cut_avg)
+count(data_seeds_avg_cl,cluster)
+
+suppressPackageStartupMessages(library(ggplot2))
+ggplot(data_seeds_avg_cl, aes(x=area, y = perimeter, color = factor(cluster))) + geom_point()
+table(data_seeds_avg_cl$cluster,seeds_label)
+```
+
+### Comparison Between Complete and Average Linkage
+Clustering led to a positive linear relationship between perimeter and area for all varieties of wheat using both complete and average linkage. Complete linkage grouped 52, 68, and 90 observations into clusters 1, 2, and 3 respectively, while average linkage yielded 65, 75, and 70. Since there were originally 70 observations for each wheat variety, average linkage appears to have produced more accurate clusters. From the table of the seed labels with corresponding clusters, Complete linkage accurately captured all 70 observations for seed type 3, 66 for seed type 2, but only captured 48 for seed type 1, grouping around 30% of type 1 into clusters 2 and 3. On the other hand, average linkage accurately captured 55, 68, and 62 for seed types 1, 2, and 3 respectively. While both methods resulted in clusters that adequately represent the different seeds, average clustering seemed to result in better results overall. 
+
+
+## Exercise 2.2 - PCA of mtcars Dataset
+```{r}
+mtcars.pca <- prcomp(mtcars[,c(1:7,10,11)], center = TRUE,scale. = TRUE)
+
+suppressPackageStartupMessages(library(ggbiplot))
+
+#Categorize these cars into US, Japanese and European:
+mtcars.country <- c(rep("Japan", 3), rep("US",4), rep("Europe", 7),rep("US",3), "Europe", rep("Japan", 3), rep("US",4), rep("Europe", 3), "US", rep("Europe", 3))
+ggbiplot(mtcars.pca,ellipse=TRUE,obs.scale = 1, var.scale = 1,var.axes=FALSE,   labels=rownames(mtcars), groups=mtcars.country) + ggtitle("PCA of mtcars dataset")
+```
+
+
+## Exercise 3.1 - Classification
+```{r}
+suppressPackageStartupMessages(require(ISLR))
+head(Smarket)
+```
+
+### Boxplot
+```{r}
+par(mfrow=c(1,8))
+par(mar=c(1,1,1,1))
+for(i in 2:4) {
+  boxplot(Smarket[,i], main=names(Smarket)[i])
+}
+```
+
+### Correlation plot
+```{r}
+suppressPackageStartupMessages(library(corrplot))
+correlations <- cor(Smarket[,2:4])
+corrplot(correlations, method="circle")
+```
+
+### Density distribution plot
+```{r}
+library(caret)
+x <- Smarket[,2:4]
+y <- Smarket[,9]
+scales <- list(x=list(relation="free"), y=list(relation="free"))
+featurePlot(x=x, y=y, plot="density", scales=scales)
+```
+
+### Logistic Regression Model & Summary
+```{r}
+glm.fit <- glm(Direction ~ Lag1 + Lag2 + Lag3, data = Smarket, family = binomial)
+summary(glm.fit)
+```
+
+### Predictions and Fitter Probabilities
+```{r}
+glm.probs <- predict(glm.fit,type = "response")
+glm.probs[1:5]
+```
+
+### Classify Up or Down
+```{r}
+glm.pred <- ifelse(glm.probs > 0.5, "Up", "Down")
+attach(Smarket)
+table(glm.pred,Direction)
+```
+
+### Classification Rate
+```{r}
+mean(glm.pred == Direction)
+```
